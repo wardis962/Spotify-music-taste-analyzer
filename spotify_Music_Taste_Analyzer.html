@@ -330,18 +330,23 @@ function renderStats(s) {
     <div class="stat-card"><div class="stat-value">${s.diversity}%</div><div class="stat-label">Diversity score</div></div>
   `;
 
+  const maxDecadeCount = s.decades[0]?.count || 1;
+  document.getElementById('decade-grid').innerHTML = s.decades.map(d => `
+    <div class="gbar-row">
+      <div class="gbar-label">${d.decade}</div>
+      <div class="gbar-track">
+        <div class="gbar-fill" style="width:${Math.round((d.count / maxDecadeCount) * 100)}%"></div>
+      </div>
+      <div style="font-size:11px;color:#555;width:30px;text-align:right;flex-shrink:0">${d.count}</div>
+    </div>`).join('');
+
   document.getElementById('artists-list').innerHTML = s.topArtists.map((a, i) => `
     <div class="artist-row">
       <div class="artist-num">#${i+1}</div>
       <div class="artist-name-text">${a.name}</div>
       <div class="artist-badge">${a.count} song${a.count !== 1 ? 's' : ''}</div>
     </div>`).join('');
-
-  document.getElementById('decade-grid').innerHTML = s.decades.map((d, i) => `
-    <div class="decade-pill ${i === 0 ? 'top' : ''}">${d.decade} <span style="opacity:0.5;font-weight:400">${d.count}</span></div>`).join('');
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
+}// ─────────────────────────────────────────────────────────────────────────────
 // LOCAL ANALYSIS ENGINE  —  no API calls, runs entirely in the browser
 // ─────────────────────────────────────────────────────────────────────────────
 
