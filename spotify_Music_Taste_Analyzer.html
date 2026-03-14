@@ -272,7 +272,7 @@ async function doAnalyze() {
 
 async function fetchLikedTracks(token) {
   let tracks = [], url = 'https://api.spotify.com/v1/me/tracks?limit=50';
-  while (url && tracks.length < 200) {
+  while (url && tracks.length < 500) {
     const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
     if (!res.ok) throw new Error('Spotify API error ' + res.status);
     const d = await res.json();
