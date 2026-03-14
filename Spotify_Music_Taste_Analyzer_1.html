@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spotify Music Taste Analyzer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0a; color: #e8e8e8; min-height: 100vh; padding: 2rem 1rem; }
+  .container { max-width: 620px; margin: 0 auto; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  .header { display: flex; align-items: center; gap: 12px; margin-bottom: 2rem; }
+  .spotify-icon { width: 40px; height: 40px; background: #1DB954; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .spotify-icon svg { width: 22px; height: 22px; fill: white; }
+  .header h1 { font-size: 20px; font-weight: 600; }
+  .header p { font-size: 13px; color: #888; margin-top: 2px; }
+
+  .card { background: #141414; border: 1px solid #222; border-radius: 14px; padding: 1.5rem; margin-bottom: 1rem; }
+  .step-label { font-size: 11px; font-weight: 600; color: #1DB954; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .step-text { font-size: 13px; color: #aaa; line-height: 1.6; margin-bottom: 12px; }
+  .step-text a { color: #1DB954; }
+  .step-text code { background: #222; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 12px; color: #e8e8e8; }
+
+  input[type="text"] { width: 100%; padding: 10px 14px; font-size: 14px; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; color: #e8e8e8; font-family: monospace; outline: none; transition: border-color 0.2s; }
+  input[type="text"]:focus { border-color: #1DB954; }
+  input[type="text"]::placeholder { color: #555; }
+
+  .btn { display: block; width: 100%; padding: 12px; font-size: 14px; font-weight: 600; border: none; border-radius: 10px; cursor: pointer; transition: opacity 0.15s, transform 0.1s; margin-top: 10px; text-align: center; }
+  .btn:active { transform: scale(0.98); }
+  .btn-green { background: #1DB954; color: white; }
+  .btn-green:hover { opacity: 0.9; }
+
+  .hint { font-size: 12px; margin-top: 6px; line-height: 1.5; }
+  .hint.success { color: #1DB954; }
+  .hint.error { color: #e74c3c; }
+  .hint.muted { color: #666; }
+
+  .loading-screen { text-align: center; padding: 4rem 1rem; }
+  .spinner { width: 44px; height: 44px; border: 3px solid #222; border-top-color: #1DB954; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 15px; color: #ccc; margin-bottom: 6px; font-weight: 500; }
+  .loading-sub { font-size: 12px; color: #555; }
+  .progress-bar { width: 220px; height: 3px; background: #222; border-radius: 2px; margin: 14px auto 0; overflow: hidden; }
+  .progress-fill { height: 100%; background: #1DB954; border-radius: 2px; transition: width 0.5s ease; }
+
+  .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+  .results-header h2 { font-size: 20px; font-weight: 600; }
+  .btn-small { font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid #333; background: transparent; color: #888; cursor: pointer; }
+  .btn-small:hover { background: #1a1a1a; }
+
+  .section-title { font-size: 11px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+
+  /* Stat cards */
+  .stat-row { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-bottom: 1.5rem; }
+  .stat-card { background: #141414; border: 1px solid #222; border-radius: 12px; padding: 14px; }
+  .stat-value { font-size: 24px; font-weight: 600; }
+  .stat-label { font-size: 11px; color: #555; margin-top: 3px; }
+
+  /* Top artists */
+  .artists-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.5rem; }
+  .artist-row { display: flex; align-items: center; gap: 12px; background: #141414; border: 1px solid #222; border-radius: 10px; padding: 10px 14px; }
+  .artist-num { font-size: 12px; color: #555; width: 22px; flex-shrink: 0; }
+  .artist-name-text { font-size: 14px; font-weight: 500; flex: 1; }
+  .artist-badge { font-size: 11px; color: #1DB954; background: #0d2b18; padding: 3px 9px; border-radius: 20px; flex-shrink: 0; }
+
+  /* Decades */
+  .decade-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1.5rem; }
+  .decade-pill { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid #333; color: #aaa; background: #141414; }
+  .decade-pill.top { background: #0d2b18; border-color: #1a4a2a; color: #1DB954; }
+
+  /* AI results */
+  .ai-card { background: #141414; border: 1px solid #222; border-radius: 14px; padding: 1.5rem; margin-bottom: 1rem; }
+  .ai-loading { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #666; padding: 1rem 0; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: #1DB954; animation: pulse 1.2s ease-in-out infinite; flex-shrink: 0; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .mood-banner { display: flex; align-items: center; gap: 14px; margin-bottom: 1.25rem; }
+  .mood-emoji-big { font-size: 52px; line-height: 1; }
+  .mood-title { font-size: 22px; font-weight: 700; }
+  .mood-subtitle { font-size: 13px; color: #888; margin-top: 4px; }
+
+  .tags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 1.25rem; }
+  .tag { font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 20px; }
+  .tag-green { background: #0d2b18; color: #1DB954; }
+  .tag-blue  { background: #0a1a2e; color: #4a9eff; }
+  .tag-amber { background: #2a1a00; color: #f59e0b; }
+  .tag-pink  { background: #2a0a1a; color: #f472b6; }
+
+  .genre-bars { display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.25rem; }
+  .gbar-row { display: flex; align-items: center; gap: 10px; }
+  .gbar-label { font-size: 12px; color: #aaa; width: 140px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gbar-track { flex: 1; height: 6px; background: #222; border-radius: 3px; overflow: hidden; }
+  .gbar-fill { height: 100%; border-radius: 3px; background: #1DB954; width: 0%; transition: width 1.2s cubic-bezier(0.22,1,0.36,1); }
+
+  .insight-text { font-size: 14px; line-height: 1.8; color: #aaa; }
+  .insight-text strong { color: #e8e8e8; font-weight: 600; }
+
+  .divider { border: none; border-top: 1px solid #1e1e1e; margin: 1.25rem 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- SETUP -->
+  <div id="screen-setup" class="screen active">
+    <div class="header">
+      <div class="spotify-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+      </div>
+      <div><h1>Music taste analyzer</h1><p>Discover your vibe from your liked songs</p></div>
+    </div>
+
+    <div class="card">
+      <div class="step-label">Step 1 — Create a Spotify app</div>
+      <div class="step-text">
+        Go to <a href="https://developer.spotify.com/dashboard" target="_blank">developer.spotify.com/dashboard</a> → Create app → set redirect URI to <code>http://127.0.0.1:3000</code> → check <strong>Web API</strong> → Save. Copy your Client ID.
+      </div>
+      <input type="text" id="client-id" placeholder="Paste your Client ID here..." />
+    </div>
+
+    <div class="card">
+      <div class="step-label">Step 2 — Connect to Spotify</div>
+      <div class="step-text">Click below. Spotify opens in a new tab. Log in and approve. You'll land on a page that won't load — that's fine! Copy the full URL from your browser bar and paste it below.</div>
+      <button class="btn btn-green" id="btn-auth" onclick="startAuth()">Connect to Spotify</button>
+    </div>
+
+    <div class="card" id="paste-card" style="display:none">
+      <div class="step-label">Step 3 — Paste the redirect URL</div>
+      <div class="step-text">Copy the full URL from your browser. It starts with <code>http://127.0.0.1:3000/?code=...</code></div>
+      <input type="text" id="redirect-url" placeholder="http://127.0.0.1:3000/?code=AQC..." oninput="onPaste()" />
+      <div class="hint muted" id="paste-hint">Waiting for URL…</div>
+      <button class="btn btn-green" id="btn-analyze" style="display:none" onclick="doAnalyze()">Analyze my music taste →</button>
+    </div>
+
+    <div class="hint error" id="error-msg" style="margin-top:8px;display:none"></div>
+  </div>
+
+  <!-- LOADING -->
+  <div id="screen-loading" class="screen">
+    <div class="loading-screen">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loading-msg">Connecting…</div>
+      <div class="loading-sub" id="loading-sub"></div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="screen-results" class="screen">
+    <div class="results-header">
+      <h2>Your music taste</h2>
+      <button class="btn-small" onclick="reset()">← Start over</button>
+    </div>
+
+    <div class="section-title">Overview</div>
+    <div class="stat-row" id="stat-row"></div>
+
+    <div class="section-title">Top artists</div>
+    <div class="artists-list" id="artists-list"></div>
+
+    <div class="section-title">Music eras</div>
+    <div class="decade-grid" id="decade-grid"></div>
+
+    <div class="section-title">Analysis</div>
+    <div class="ai-card">
+      <div class="ai-loading" id="ai-loading"><div class="dot"></div> Analysing your music taste…</div>
+      <div id="ai-results" style="display:none"></div>
+    </div>
+  </div>
+
+</div>
+<script>
+function b64url(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+async function pkceChallenge() {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+  return { verifier, challenge };
+}
+
+const REDIRECT_URI = 'http://127.0.0.1:3000';
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+function setLoading(msg, sub, pct) {
+  document.getElementById('loading-msg').textContent = msg;
+  document.getElementById('loading-sub').textContent = sub || '';
+  document.getElementById('progress-fill').style.width = (pct || 0) + '%';
+}
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+}
+
+async function startAuth() {
+  const clientId = document.getElementById('client-id').value.trim();
+  if (!clientId) { showError('Please paste your Client ID first.'); return; }
+  showError('');
+  const { verifier, challenge } = await pkceChallenge();
+  sessionStorage.setItem('pkce_verifier', verifier);
+  sessionStorage.setItem('client_id', clientId);
+  const params = new URLSearchParams({
+    client_id: clientId, response_type: 'code',
+    redirect_uri: REDIRECT_URI, scope: 'user-library-read',
+    code_challenge_method: 'S256', code_challenge: challenge,
+  });
+  window.open('https://accounts.spotify.com/authorize?' + params, '_blank');
+  document.getElementById('paste-card').style.display = 'block';
+  document.getElementById('btn-auth').textContent = 'Re-open Spotify login';
+}
+
+function onPaste() {
+  const val = document.getElementById('redirect-url').value.trim();
+  const hint = document.getElementById('paste-hint');
+  const btn = document.getElementById('btn-analyze');
+  try {
+    const u = new URL(val);
+    if (u.searchParams.get('code')) {
+      hint.textContent = '✓ Code found — ready to analyze!';
+      hint.className = 'hint success';
+      btn.style.display = 'block';
+      return;
+    }
+    if (u.searchParams.get('error')) {
+      hint.textContent = 'Spotify error: ' + u.searchParams.get('error');
+      hint.className = 'hint error';
+      btn.style.display = 'none';
+      return;
+    }
+  } catch {}
+  if (val) { hint.textContent = 'No code found — paste the full URL from your browser.'; hint.className = 'hint error'; btn.style.display = 'none'; }
+}
+
+async function doAnalyze() {
+  const val = document.getElementById('redirect-url').value.trim();
+  const code = new URL(val).searchParams.get('code');
+  const verifier = sessionStorage.getItem('pkce_verifier');
+  const clientId = sessionStorage.getItem('client_id') || document.getElementById('client-id').value.trim();
+  if (!code || !verifier) { showError('Missing info — please start over.'); return; }
+
+  show('loading');
+  try {
+    setLoading('Exchanging token…', '', 10);
+    const tr = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type:'authorization_code', code, redirect_uri:REDIRECT_URI, client_id:clientId, code_verifier:verifier })
+    });
+    if (!tr.ok) { const e = await tr.json(); throw new Error(e.error_description || 'Token exchange failed'); }
+    const { access_token } = await tr.json();
+
+    setLoading('Fetching your liked songs…', 'Grabbing up to 200 tracks', 20);
+    const tracks = await fetchLikedTracks(access_token);
+
+    setLoading('Crunching the data…', `${tracks.length} songs loaded`, 75);
+    const stats = computeStats(tracks);
+    renderStats(stats);
+    show('results');
+
+    setLoading('', '', 100);
+    await getAIAnalysis(stats);
+  } catch(e) {
+    show('setup');
+    showError('Error: ' + e.message);
+  }
+}
+
+async function fetchLikedTracks(token) {
+  let tracks = [], url = 'https://api.spotify.com/v1/me/tracks?limit=50';
+  while (url && tracks.length < 200) {
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) throw new Error('Spotify API error ' + res.status);
+    const d = await res.json();
+    tracks = tracks.concat(d.items.filter(i => i && i.track));
+    url = d.next;
+    setLoading('Fetching your liked songs…', `Got ${tracks.length} tracks so far…`, 20 + Math.min(tracks.length / 4, 50));
+  }
+  return tracks;
+}
+
+function computeStats(tracks) {
+  const artistCount = {};
+  const decadeCount = {};
+
+  tracks.forEach(({ track, added_at }) => {
+    // Artists
+    track.artists.forEach(a => {
+      if (!artistCount[a.name]) artistCount[a.name] = 0;
+      artistCount[a.name]++;
+    });
+    // Decade
+    const year = parseInt((track.album?.release_date || '').slice(0, 4));
+    if (year >= 1950 && year <= 2030) {
+      const decade = Math.floor(year / 10) * 10 + 's';
+      decadeCount[decade] = (decadeCount[decade] || 0) + 1;
+    }
+  });
+
+  const topArtists = Object.entries(artistCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name, count]) => ({ name, count }));
+
+  const decades = Object.entries(decadeCount)
+    .sort((a, b) => b[1] - a[1])
+    .map(([decade, count]) => ({ decade, count }));
+
+  const uniqueArtists = Object.keys(artistCount).length;
+  const diversity = Math.min(100, Math.round((uniqueArtists / tracks.length) * 150));
+
+  // Sample of track+artist pairs for Claude
+  const sample = tracks.slice(0, 100).map(({ track }) => ({
+    title: track.name,
+    artist: track.artists[0]?.name,
+    year: (track.album?.release_date || '').slice(0, 4),
+  }));
+
+  return { totalTracks: tracks.length, uniqueArtists, diversity, topArtists, decades, sample };
+}
+
+function renderStats(s) {
+  document.getElementById('stat-row').innerHTML = `
+    <div class="stat-card"><div class="stat-value">${s.totalTracks}</div><div class="stat-label">Liked songs</div></div>
+    <div class="stat-card"><div class="stat-value">${s.uniqueArtists}</div><div class="stat-label">Unique artists</div></div>
+    <div class="stat-card"><div class="stat-value">${s.diversity}%</div><div class="stat-label">Diversity score</div></div>
+  `;
+
+  document.getElementById('artists-list').innerHTML = s.topArtists.map((a, i) => `
+    <div class="artist-row">
+      <div class="artist-num">#${i+1}</div>
+      <div class="artist-name-text">${a.name}</div>
+      <div class="artist-badge">${a.count} song${a.count !== 1 ? 's' : ''}</div>
+    </div>`).join('');
+
+  document.getElementById('decade-grid').innerHTML = s.decades.map((d, i) => `
+    <div class="decade-pill ${i === 0 ? 'top' : ''}">${d.decade} <span style="opacity:0.5;font-weight:400">${d.count}</span></div>`).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOCAL ANALYSIS ENGINE  —  no API calls, runs entirely in the browser
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Artist → genre(s) lookup (500+ artists)
+const ARTIST_GENRES = {
+  // Pop
+  'taylor swift':['pop','country pop'],'ed sheeran':['pop','singer-songwriter'],
+  'ariana grande':['pop','r&b'],'billie eilish':['indie pop','dark pop'],
+  'dua lipa':['pop','dance pop'],'harry styles':['pop','soft rock'],
+  'olivia rodrigo':['pop','indie pop'],'the weeknd':['r&b','dark pop'],
+  'post malone':['hip-hop','pop rap'],'justin bieber':['pop','r&b'],
+  'selena gomez':['pop','dance pop'],'halsey':['indie pop','alternative'],
+  'katy perry':['pop','electropop'],'lady gaga':['pop','dance pop'],
+  'miley cyrus':['pop','rock'],'sia':['pop','electropop'],
+  'charlie puth':['pop','r&b'],'shawn mendes':['pop','soft rock'],
+  'sam smith':['pop','soul'],'adele':['pop','soul'],
+  'lizzo':['pop','r&b'],'bebe rexha':['pop','dance pop'],
+  'camila cabello':['pop','latin pop'],'troye sivan':['indie pop','electropop'],
+  'lorde':['indie pop','art pop'],'lana del rey':['indie pop','dream pop'],
+  'doja cat':['pop','hip-hop'],'sza':['r&b','soul'],
+  'jhené aiko':['r&b','soul'],'kehlani':['r&b','soul'],
+
+  // Hip-Hop / Rap
+  'drake':['hip-hop','rap'],'kendrick lamar':['hip-hop','conscious rap'],
+  'j. cole':['hip-hop','conscious rap'],'kanye west':['hip-hop','rap'],
+  'travis scott':['hip-hop','trap'],'cardi b':['hip-hop','rap'],
+  'nicki minaj':['hip-hop','rap'],'21 savage':['hip-hop','trap'],
+  'lil uzi vert':['hip-hop','emo rap'],'juice wrld':['hip-hop','emo rap'],
+  'xxxtentacion':['hip-hop','emo rap'],'lil baby':['hip-hop','trap'],
+  'gunna':['hip-hop','trap'],'future':['hip-hop','trap'],
+  'young thug':['hip-hop','trap'],'a$ap rocky':['hip-hop','rap'],
+  'chance the rapper':['hip-hop','conscious rap'],'mac miller':['hip-hop','conscious rap'],
+  'tyler the creator':['hip-hop','alternative hip-hop'],
+  'earl sweatshirt':['hip-hop','alternative hip-hop'],
+  'frank ocean':['r&b','alternative r&b'],'childish gambino':['hip-hop','r&b'],
+  'logic':['hip-hop','conscious rap'],'big sean':['hip-hop','rap'],
+  'wiz khalifa':['hip-hop','rap'],'meek mill':['hip-hop','rap'],
+  'asap ferg':['hip-hop','trap'],'lil wayne':['hip-hop','rap'],
+  'eminem':['hip-hop','rap'],'jay-z':['hip-hop','rap'],
+  'nas':['hip-hop','conscious rap'],'biggie':['hip-hop','rap'],
+  'tupac':['hip-hop','rap'],'snoop dogg':['hip-hop','rap'],
+  'ice cube':['hip-hop','rap'],'outkast':['hip-hop','alternative hip-hop'],
+  'migos':['hip-hop','trap'],'quavo':['hip-hop','trap'],
+  'offset':['hip-hop','trap'],'takeoff':['hip-hop','trap'],
+  'roddy ricch':['hip-hop','trap'],'polo g':['hip-hop','rap'],
+
+  // R&B / Soul
+  'beyoncé':['r&b','pop'],'rihanna':['r&b','pop'],
+  'usher':['r&b','pop'],'alicia keys':['r&b','soul'],
+  'john legend':['r&b','soul'],'h.e.r.':['r&b','soul'],
+  'anderson .paak':['r&b','soul'],'daniel caesar':['r&b','soul'],
+  'giveon':['r&b','soul'],'lucky daye':['r&b','soul'],
+  'ari lennox':['r&b','soul'],'tone stith':['r&b','soul'],
+  'bryson tiller':['r&b','trap soul'],'partynextdoor':['r&b','trap soul'],
+  'khalid':['r&b','indie pop'],'summer walker':['r&b','soul'],
+  'jacquees':['r&b'],'mario':['r&b'],'trey songz':['r&b'],
+  'chris brown':['r&b','pop'],'august alsina':['r&b'],
+  'marvin gaye':['soul','r&b'],'stevie wonder':['soul','r&b'],
+  'aretha franklin':['soul','gospel'],'otis redding':['soul'],
+  'sam cooke':['soul','gospel'],'ray charles':['soul','blues'],
+  'james brown':['soul','funk'],'al green':['soul'],
+  'whitney houston':['r&b','pop'],'michael jackson':['pop','r&b'],
+
+  // Rock / Alternative
+  'radiohead':['alternative','art rock'],'arctic monkeys':['indie rock','alternative'],
+  'the strokes':['indie rock','garage rock'],'vampire weekend':['indie rock','indie pop'],
+  'tame impala':['psychedelic rock','indie pop'],'foster the people':['indie pop','alternative'],
+  'imagine dragons':['pop rock','alternative'],'twenty one pilots':['alternative','pop'],
+  'panic! at the disco':['pop rock','alternative'],'fall out boy':['pop punk','rock'],
+  'my chemical romance':['emo','punk rock'],'paramore':['pop punk','emo'],
+  'green day':['punk rock','pop punk'],'blink-182':['pop punk','punk rock'],
+  'weezer':['alternative rock','pop rock'],'nirvana':['grunge','alternative rock'],
+  'pearl jam':['grunge','alternative rock'],'soundgarden':['grunge','hard rock'],
+  'alice in chains':['grunge','heavy metal'],'stone temple pilots':['grunge','alternative rock'],
+  'red hot chili peppers':['alternative rock','funk rock'],
+  'foo fighters':['alternative rock','hard rock'],
+  'linkin park':['alternative metal','nu-metal'],'system of a down':['alternative metal','hard rock'],
+  'slipknot':['heavy metal','alternative metal'],'tool':['progressive metal','alternative metal'],
+  'metallica':['heavy metal','thrash metal'],'black sabbath':['heavy metal','hard rock'],
+  'led zeppelin':['hard rock','blues rock'],'the rolling stones':['rock','blues rock'],
+  'the beatles':['rock','pop'],'the doors':['psychedelic rock','rock'],
+  'pink floyd':['progressive rock','psychedelic rock'],'david bowie':['glam rock','art rock'],
+  'queen':['rock','glam rock'],'fleetwood mac':['rock','soft rock'],
+  'eagles':['rock','country rock'],'elton john':['pop','rock'],
+  'bruce springsteen':['rock','heartland rock'],'tom petty':['rock','heartland rock'],
+  'bob dylan':['folk rock','singer-songwriter'],'neil young':['folk rock','rock'],
+  'simon & garfunkel':['folk','singer-songwriter'],'crosby stills nash & young':['folk rock'],
+  'the cure':['new wave','goth rock'],'depeche mode':['synth-pop','new wave'],
+  'joy division':['post-punk','new wave'],'new order':['new wave','synth-pop'],
+  'the smiths':['indie rock','post-punk'],'morrissey':['indie rock','post-punk'],
+  'blur':['britpop','alternative rock'],'oasis':['britpop','rock'],
+  'pulp':['britpop','indie rock'],'suede':['britpop','glam rock'],
+  'placebo':['alternative rock','glam rock'],'portishead':['trip-hop','alternative'],
+  'massive attack':['trip-hop','electronic'],'tricky':['trip-hop','electronic'],
+  'sigur rós':['post-rock','ambient'],'mogwai':['post-rock','instrumental'],
+  'godspeed you! black emperor':['post-rock','ambient'],
+  'explosions in the sky':['post-rock','instrumental'],
+  'bon iver':['indie folk','folk pop'],'iron & wine':['indie folk','folk'],
+  'fleet foxes':['indie folk','psychedelic folk'],'sufjan stevens':['indie folk','chamber pop'],
+  'the national':['indie rock','art rock'],'lcd soundsystem':['dance punk','indie rock'],
+  'interpol':['post-punk revival','indie rock'],'editors':['post-punk','alternative'],
+  'the killers':['indie rock','synth-pop'],'kings of leon':['indie rock','southern rock'],
+  'muse':['alternative rock','progressive rock'],'coldplay':['alternative rock','pop'],
+  'u2':['rock','post-punk'],'the police':['new wave','rock'],
+  'talking heads':['new wave','art rock'],'blondie':['new wave','punk rock'],
+  'television':['punk rock','art rock'],'patti smith':['punk rock','rock'],
+  'sonic youth':['noise rock','alternative rock'],'pixies':['alternative rock','indie rock'],
+  'dinosaur jr.':['indie rock','grunge'],'pavement':['indie rock','lo-fi'],
+  'built to spill':['indie rock','alternative'],'modest mouse':['indie rock','alternative'],
+  'death cab for cutie':['indie rock','indie pop'],'bright eyes':['indie folk','emo'],
+  'neutral milk hotel':['indie folk','psychedelic'],'the flaming lips':['psychedelic rock','alternative'],
+  'beck':['alternative','folk rock'],'jack white':['garage rock','blues rock'],
+  'the white stripes':['garage rock','blues rock'],'the black keys':['blues rock','garage rock'],
+  'cage the elephant':['indie rock','alternative rock'],'the 1975':['indie pop','synth-pop'],
+  'glass animals':['indie pop','psychedelic pop'],'alt-j':['indie rock','art rock'],
+  'bastille':['indie pop','alternative'],'of monsters and men':['indie folk','indie pop'],
+  'awolnation':['alternative rock','synth-pop'],'walk the moon':['indie pop','new wave'],
+  'portugal. the man':['indie rock','psychedelic pop'],'mgmt':['indie pop','psychedelic pop'],
+  'two door cinema club':['indie pop','indie rock'],'the xx':['indie pop','dream pop'],
+  'beach house':['dream pop','indie pop'],'washed out':['chillwave','dream pop'],
+  'neon trees':['indie pop','alternative rock'],
+
+  // Electronic / Dance
+  'daft punk':['electronic','house'],'the chemical brothers':['electronic','big beat'],
+  'the prodigy':['electronic','big beat'],'aphex twin':['electronic','ambient'],
+  'boards of canada':['electronic','ambient'],'burial':['electronic','dubstep'],
+  'four tet':['electronic','ambient'],'jon hopkins':['electronic','ambient'],
+  'moderat':['electronic','synth-pop'],'apparat':['electronic','ambient'],
+  'deadmau5':['electronic','house'],'skrillex':['electronic','dubstep'],
+  'diplo':['electronic','trap'],'calvin harris':['electronic','dance pop'],
+  'david guetta':['electronic','dance pop'],'tiësto':['electronic','trance'],
+  'martin garrix':['electronic','progressive house'],'avicii':['electronic','progressive house'],
+  'zedd':['electronic','dance pop'],'marshmello':['electronic','future bass'],
+  'the chainsmokers':['electronic','dance pop'],'kygo':['electronic','tropical house'],
+  'flume':['electronic','future bass'],'odesza':['electronic','ambient'],
+  'disclosure':['electronic','uk garage'],'jamie xx':['electronic','uk garage'],
+  'caribou':['psychedelic pop','electronic'],'flying lotus':['electronic','jazz fusion'],
+  'kaytranada':['electronic','r&b'],'shlohmo':['electronic','r&b'],
+  'james blake':['electronic','soul'],'bon iver':['indie folk','folk pop'],
+  'silk sonic':['r&b','soul'],'bruno mars':['pop','r&b'],
+
+  // Country / Folk
+  'johnny cash':['country','folk'],'willie nelson':['country','outlaw country'],
+  'waylon jennings':['country','outlaw country'],'merle haggard':['country'],
+  'hank williams':['country','honky tonk'],'dolly parton':['country','pop'],
+  'kenny rogers':['country','pop'],'garth brooks':['country'],
+  'george strait':['country'],'alan jackson':['country'],
+  'tim mcgraw':['country','pop country'],'faith hill':['country','pop country'],
+  'blake shelton':['country'],'miranda lambert':['country'],
+  'carrie underwood':['country','pop'],'luke bryan':['country','pop country'],
+  'florida georgia line':['country','bro-country'],'thomas rhett':['country','pop country'],
+  'chris stapleton':['country','blues rock'],'sturgill simpson':['country','outlaw country'],
+  'kacey musgraves':['country pop','indie pop'],'maren morris':['country','pop'],
+  'brandi carlile':['folk rock','country'],'the lumineers':['indie folk','folk rock'],
+  'mumford & sons':['indie folk','folk rock'],'the avett brothers':['indie folk','folk rock'],
+
+  // Jazz / Blues
+  'miles davis':['jazz','bebop'],'john coltrane':['jazz','bebop'],
+  'charlie parker':['jazz','bebop'],'thelonious monk':['jazz','bebop'],
+  'bill evans':['jazz','cool jazz'],'dave brubeck':['jazz','cool jazz'],
+  'chet baker':['jazz','cool jazz'],'stan getz':['jazz','bossa nova'],
+  'herbie hancock':['jazz','fusion'],'wayne shorter':['jazz','fusion'],
+  'b.b. king':['blues','electric blues'],'muddy waters':['blues','chicago blues'],
+  'robert johnson':['blues','delta blues'],'john lee hooker':['blues'],
+  'howlin wolf':['blues','chicago blues'],'buddy guy':['blues'],
+
+  // Latin
+  'bad bunny':['latin trap','reggaeton'],'j balvin':['reggaeton','latin pop'],
+  'ozuna':['reggaeton','latin pop'],'daddy yankee':['reggaeton'],
+  'maluma':['reggaeton','latin pop'],'nicky jam':['reggaeton'],
+  'shakira':['latin pop','pop'],'enrique iglesias':['latin pop','pop'],
+  'marc anthony':['salsa','latin pop'],'ricky martin':['latin pop','pop'],
+
+  // K-Pop
+  'bts':['k-pop','pop'],'blackpink':['k-pop','pop'],
+  'exo':['k-pop'],'nct 127':['k-pop'],'stray kids':['k-pop'],
+  'twice':['k-pop'],'red velvet':['k-pop'],'aespa':['k-pop'],
+  'seventeen':['k-pop'],'got7':['k-pop'],'monsta x':['k-pop'],
+  'shinee':['k-pop'],'bigbang':['k-pop'],'2ne1':['k-pop'],
+  'iu':['k-pop','ballad'],'taeyeon':['k-pop','ballad'],
+
+  // Classical / Soundtrack
+  'hans zimmer':['film score','orchestral'],'john williams':['film score','orchestral'],
+  'ennio morricone':['film score','orchestral'],'bernard herrmann':['film score'],
+  'ludovico einaudi':['contemporary classical','neo-classical'],
+  'max richter':['neo-classical','ambient'],'nils frahm':['neo-classical','ambient'],
+};
+
+// Keywords in song/album titles → genre signals
+const TITLE_GENRE_SIGNALS = {
+  'hip-hop':     /\b(rap|freestyle|cypher|bars|drill|trap|gang|thug|hood|street|grind|hustle|flex|drip|sauce)\b/i,
+  'r&b':         /\b(love|heart|baby|girl|boy|feel|vibe|smooth|groove|tonight|forever|always|never|miss)\b/i,
+  'electronic':  /\b(remix|edit|mix|club|beat|bass|drop|wave|synth|rave|dance|electro|techno|house)\b/i,
+  'rock':        /\b(rock|roll|guitar|amp|anthem|loud|noise|distortion|breakdown|solo|riff|shred)\b/i,
+  'country':     /\b(road|truck|beer|whiskey|boots|farm|dirt|small town|country|southern|y'all|honky)\b/i,
+  'indie folk':  /\b(river|mountain|forest|winter|autumn|leaves|quiet|still|cabin|wandering|folk)\b/i,
+  'pop':         /\b(night|stars|lights|party|dance|fun|summer|sun|good time|hit|radio|top)\b/i,
+  'metal':       /\b(death|blood|fire|hell|devil|war|chaos|rage|destroy|evil|dark|eternal|storm)\b/i,
+  'jazz':        /\b(blues|swing|bebop|jazz|improvise|scat|modal|blue note|standard)\b/i,
+};
+
+// Mood detection from track/artist signals
+const MOOD_PROFILES = [
+  {
+    id: 'euphoric',
+    label: 'Euphoric & High-Energy',
+    emoji: '⚡',
+    subtitle: 'You live for the moments that hit hard — big drops, anthems, and music that makes the room electric.',
+    tags: ['High Energy', 'Party Starter', 'Maximalist', 'Loud'],
+    match: s => s.energyScore > 70,
+  },
+  {
+    id: 'melancholic',
+    label: 'Beautifully Melancholic',
+    emoji: '🌧️',
+    subtitle: 'You find beauty in the bittersweet. Your taste runs deep — music that sits with you long after it ends.',
+    tags: ['Introspective', 'Emotionally Deep', 'Late Night', 'Atmospheric'],
+    match: s => s.moodScore < 35 && s.depthScore > 50,
+  },
+  {
+    id: 'chill',
+    label: 'Smooth & Laid-Back',
+    emoji: '🌊',
+    subtitle: 'You curate the perfect background — music that flows effortlessly and keeps the mood right.',
+    tags: ['Chill', 'Smooth', 'Background Grooves', 'Effortless'],
+    match: s => s.moodScore >= 35 && s.moodScore < 60 && s.energyScore < 55,
+  },
+  {
+    id: 'nostalgic',
+    label: 'Nostalgic Soul',
+    emoji: '🕰️',
+    subtitle: 'You have an ear for timeless music. Whether it\'s classic rock or old-school R&B, you know the good stuff doesn\'t expire.',
+    tags: ['Nostalgic', 'Classic Taste', 'Timeless', 'Old Soul'],
+    match: s => s.vintageScore > 55,
+  },
+  {
+    id: 'eclectic',
+    label: 'Eclectic & Curious',
+    emoji: '🎨',
+    subtitle: 'Your library is a genre-hopping adventure. You refuse to be boxed in — and your playlist proves it.',
+    tags: ['Eclectic', 'Genre-Fluid', 'Open-Minded', 'Adventurous'],
+    match: s => s.genreSpread > 5 && s.diversity > 65,
+  },
+  {
+    id: 'hypedup',
+    label: 'Hype & Street',
+    emoji: '🔥',
+    subtitle: 'Your library runs hot — trap, rap, and bass-heavy energy. You keep it current and you keep it loud.',
+    tags: ['Trap', 'Street', 'Current', 'Bass Heavy'],
+    match: s => (s.genreScores['hip-hop'] || 0) + (s.genreScores['trap'] || 0) > 50,
+  },
+  {
+    id: 'indie',
+    label: 'Indie & Alternative',
+    emoji: '🎸',
+    subtitle: 'You gravitate toward the art behind the music — independent voices, raw production, and guitar-driven feeling.',
+    tags: ['Indie', 'Alternative', 'Guitar-Driven', 'Authentic'],
+    match: s => (s.genreScores['indie rock'] || 0) + (s.genreScores['indie pop'] || 0) + (s.genreScores['alternative'] || 0) > 45,
+  },
+  {
+    id: 'electronic',
+    label: 'Digital & Synthetic',
+    emoji: '🤖',
+    subtitle: 'You hear music as architecture — layers, textures, and engineered sound that takes you somewhere else entirely.',
+    tags: ['Electronic', 'Synth-Heavy', 'Club Ready', 'Futuristic'],
+    match: s => (s.genreScores['electronic'] || 0) + (s.genreScores['house'] || 0) > 40,
+  },
+  {
+    id: 'soulful',
+    label: 'Soulful & Heartfelt',
+    emoji: '🎷',
+    subtitle: 'You\'re drawn to music with real emotion and groove — R&B, soul, and the singers who mean every word.',
+    tags: ['Soulful', 'Emotional', 'Groove-Based', 'Heartfelt'],
+    match: s => (s.genreScores['r&b'] || 0) + (s.genreScores['soul'] || 0) > 45,
+  },
+  {
+    id: 'balanced',
+    label: 'Well-Rounded Listener',
+    emoji: '🎵',
+    subtitle: 'Your taste is genuinely broad — you pick songs for how they feel, not which genre box they fit in.',
+    tags: ['Balanced', 'Diverse', 'Song-First', 'Versatile'],
+    match: () => true, // fallback
+  },
+];
+
+function getLocalAnalysis(stats) {
+  // ── 1. Score each genre across all top artists ────────────────────────────
+  const genreScores = {};
+  stats.topArtists.forEach(({ name, count }) => {
+    const key = name.toLowerCase();
+    const genres = ARTIST_GENRES[key];
+    if (genres) {
+      genres.forEach(g => { genreScores[g] = (genreScores[g] || 0) + count; });
+    }
+  });
+
+  // Also scan sample track/artist names for genre signals
+  stats.sample.forEach(({ title, artist }) => {
+    const text = `${title} ${artist}`.toLowerCase();
+    // Check artist name lookup on sample artists too
+    const aKey = (artist || '').toLowerCase();
+    if (ARTIST_GENRES[aKey]) {
+      ARTIST_GENRES[aKey].forEach(g => { genreScores[g] = (genreScores[g] || 0) + 0.5; });
+    }
+    // Keyword signals from title
+    for (const [genre, regex] of Object.entries(TITLE_GENRE_SIGNALS)) {
+      if (regex.test(text)) genreScores[genre] = (genreScores[genre] || 0) + 0.3;
+    }
+  });
+
+  // ── 2. Normalise genre scores to 0–100 ───────────────────────────────────
+  const totalGenreSignal = Object.values(genreScores).reduce((a, b) => a + b, 0) || 1;
+  const normGenres = Object.entries(genreScores)
+    .map(([name, raw]) => ({ name, score: Math.round((raw / totalGenreSignal) * 100) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
+  // ── 3. Compute mood signals ───────────────────────────────────────────────
+  // energyScore: how much of their library is high-energy genres
+  const highEnergyGenres = ['hip-hop','trap','electronic','house','metal','punk rock','dance pop'];
+  const lowEnergyGenres  = ['ambient','indie folk','dream pop','neo-classical','soul','jazz'];
+  const energyScore = Math.min(100, highEnergyGenres.reduce((s, g) => s + (genreScores[g] || 0), 0)
+    / (totalGenreSignal / 100));
+
+  // moodScore: happy/bright vs dark/sad — based on decade + genre mix
+  const brightGenres = ['pop','dance pop','reggaeton','k-pop','country pop'];
+  const darkGenres   = ['emo','dark pop','post-punk','goth rock','emo rap','grunge'];
+  const brightSignal = brightGenres.reduce((s, g) => s + (genreScores[g] || 0), 0);
+  const darkSignal   = darkGenres.reduce((s, g)   => s + (genreScores[g] || 0), 0);
+  const moodScore    = brightSignal + darkSignal === 0 ? 50
+    : Math.round((brightSignal / (brightSignal + darkSignal)) * 100);
+
+  // vintageScore: how much music comes from pre-2000s
+  const totalDecades = stats.decades.reduce((s, d) => s + d.count, 0) || 1;
+  const vintageCount = stats.decades
+    .filter(d => parseInt(d.decade) < 2000)
+    .reduce((s, d) => s + d.count, 0);
+  const vintageScore = Math.round((vintageCount / totalDecades) * 100);
+
+  // depthScore: proxy for emotional depth — singer-songwriter, indie folk, jazz, soul
+  const deepGenres = ['singer-songwriter','indie folk','jazz','soul','art rock','conscious rap','blues'];
+  const depthScore = Math.min(100, deepGenres.reduce((s, g) => s + (genreScores[g] || 0), 0)
+    / (totalGenreSignal / 100));
+
+  // genreSpread: number of distinct genre families detected
+  const genreSpread = Object.keys(genreScores).length;
+
+  const signals = {
+    genreScores, energyScore, moodScore, vintageScore, depthScore,
+    genreSpread, diversity: stats.diversity,
+  };
+
+  // ── 4. Pick best matching mood profile ───────────────────────────────────
+  const mood = MOOD_PROFILES.find(p => p.match(signals)) || MOOD_PROFILES[MOOD_PROFILES.length - 1];
+
+  // ── 5. Build tags (first 2 from mood profile, then era + diversity) ───────
+  const tags = [...mood.tags.slice(0, 2)];
+  if (vintageScore > 40) tags.push('Vintage Ear');
+  else if (stats.decades[0]?.decade >= '2020s') tags.push('Trend-Forward');
+  if (stats.diversity > 70) tags.push('Genre Explorer');
+  else if (stats.diversity < 35) tags.push('Loyalist');
+  const finalTags = [...new Set([...mood.tags.slice(0, 2), ...tags])].slice(0, 4);
+
+  // ── 6. Generate insight paragraph ────────────────────────────────────────
+  const topArtistNames = stats.topArtists.slice(0, 3).map(a => `<strong>${a.name}</strong>`);
+  const topGenreNames  = normGenres.slice(0, 2).map(g => `<strong>${g.name}</strong>`);
+  const dominantDecade = stats.decades[0]?.decade || 'recent decades';
+  const artistList = topArtistNames.length === 1
+    ? topArtistNames[0]
+    : topArtistNames.slice(0, -1).join(', ') + ' and ' + topArtistNames[topArtistNames.length - 1];
+
+  let insight = '';
+
+  if (topArtistNames.length > 0) {
+    insight += `Your most-played artists — ${artistList} — say a lot about you. `;
+  }
+
+  if (normGenres.length >= 2) {
+    insight += `At the core, your taste leans ${topGenreNames[0]} with a strong ${topGenreNames[1]} streak. `;
+  } else if (normGenres.length === 1) {
+    insight += `Your listening is clearly rooted in ${topGenreNames[0]}. `;
+  }
+
+  if (vintageScore > 60) {
+    insight += `You have a real love for music from the ${dominantDecade} — there's something about that era's sound you keep coming back to. `;
+  } else if (vintageScore > 30) {
+    insight += `You bridge old and new comfortably, with a noticeable pull toward ${dominantDecade} sounds. `;
+  } else {
+    insight += `Your library skews contemporary — you're clearly plugged into what's happening now. `;
+  }
+
+  if (stats.diversity > 70) {
+    insight += `With ${stats.uniqueArtists} unique artists across ${stats.totalTracks} liked songs, you're clearly someone who hunts for great music wherever it hides.`;
+  } else if (stats.diversity < 35) {
+    insight += `You know what you like — your ${stats.uniqueArtists} go-to artists get serious replay, and you're not afraid to be loyal to your favourites.`;
+  } else {
+    insight += `You've got solid range: ${stats.uniqueArtists} distinct artists tells me you explore, but you also have a clear core sound you return to.`;
+  }
+
+  return {
+    mood:     mood.label,
+    emoji:    mood.emoji,
+    subtitle: mood.subtitle,
+    tags:     finalTags,
+    genres:   normGenres.length > 0 ? normGenres : [{ name: 'Varied / Mixed', score: 100 }],
+    insight,
+  };
+}
+
+async function getAIAnalysis(stats) {
+  // Slight artificial delay so the "Analysing…" state is visible
+  await new Promise(r => setTimeout(r, 600));
+  try {
+    const result = getLocalAnalysis(stats);
+    renderAI(result);
+  } catch(e) {
+    document.getElementById('ai-loading').innerHTML =
+      '<span style="color:#e74c3c">Analysis failed — please try refreshing.</span>';
+  }
+}
+
+function renderAI(r) {
+  const tagColors = ['tag-green', 'tag-blue', 'tag-amber', 'tag-pink'];
+  const maxScore = r.genres[0]?.score || 100;
+
+  document.getElementById('ai-loading').style.display = 'none';
+  document.getElementById('ai-results').style.display = 'block';
+  document.getElementById('ai-results').innerHTML = `
+    <div class="mood-banner">
+      <div class="mood-emoji-big">${r.emoji}</div>
+      <div>
+        <div class="mood-title">${r.mood}</div>
+        <div class="mood-subtitle">${r.subtitle}</div>
+      </div>
+    </div>
+    <div class="tags">
+      ${r.tags.map((t, i) => `<span class="tag ${tagColors[i % tagColors.length]}">${t}</span>`).join('')}
+    </div>
+    <hr class="divider">
+    <div class="section-title" style="margin-bottom:10px">Detected genres</div>
+    <div class="genre-bars" id="genre-bars-ai">
+      ${r.genres.map((g, i) => `
+        <div class="gbar-row">
+          <div class="gbar-label">${g.name}</div>
+          <div class="gbar-track"><div class="gbar-fill" id="gf-${i}"></div></div>
+        </div>`).join('')}
+    </div>
+    <hr class="divider">
+    <div class="insight-text">${r.insight.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</div>
+  `;
+
+  setTimeout(() => {
+    r.genres.forEach((g, i) => {
+      const el = document.getElementById('gf-' + i);
+      if (el) el.style.width = Math.round((g.score / maxScore) * 100) + '%';
+    });
+  }, 100);
+}
+
+function reset() {
+  sessionStorage.clear();
+  document.getElementById('client-id').value = '';
+  document.getElementById('redirect-url').value = '';
+  document.getElementById('paste-card').style.display = 'none';
+  document.getElementById('btn-analyze').style.display = 'none';
+  document.getElementById('btn-auth').textContent = 'Connect to Spotify';
+  showError('');
+  show('setup');
+}
+</script>
+</body>
+</html>
